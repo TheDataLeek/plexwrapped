@@ -47,9 +47,10 @@ def main():
         extract_streams(source_db)
 
     with orm.db_session():
+        print(orm.select((a.title, a.parent_title) for a in Media if a.parent_title.lower() == "breaking bad")[:])
         # print(orm.select(a.name for a in Account)[:])
         # print(orm.select((a.title, a.parent_title) for a in Media)[:])
-        print(orm.select(a.ts for a in Stream)[:])
+        # print(orm.select(a.ts for a in Stream)[:])
 
 
 @orm.db_session
@@ -71,20 +72,37 @@ def extract_media(source_db):
     TODO: parents aren't being extracted properly
     """
     query = """
-      SELECT
-        child.id AS originalid
-      , child.title
-      , parent.title AS parent_title
-      , CASE
-          WHEN child.metadata_type = 1 THEN 'film'
-          WHEN child.metadata_type = 4 THEN 'episode'
-          WHEN child.metadata_type IN (2, 3) THEN 'series'
-        END AS media_type
-      FROM metadata_items child
-      LEFT JOIN metadata_items parent
-        ON child.parent_id = parent.id
-      WHERE child.title IS NOT NULL
-          AND child.title != ''
+        SELECT
+          mti1.id AS originalid
+        , mti1.title
+        , mti3.title AS parent_title
+        , CASE
+            WHEN mti1.metadata_type = 1 THEN 'film'
+            WHEN mti1.metadata_type = 4 THEN 'episode'
+            WHEN mti1.metadata_type IN (2, 3) THEN 'series'
+          END AS media_type
+        , mti1.studio
+        , mti1.rating
+        , mti1.audience_rating
+        , mti1.content_rating
+        , ((mti1.duration / 1000) / 60) duration_minutes
+        , mti1.summary
+        , mti1.year
+        , DATE(mti1.originally_available_at, 'unixepoch', 'localtime') AS release_date
+        , DATE(mti1.added_at, 'unixepoch', 'localtime') AS added_date
+        , mti1.tags_genre
+        , mti1.tags_director
+        , mti1.tags_writer
+        , mti1.tags_star
+        , mti1.tags_country
+        FROM metadata_items mti1
+        LEFT JOIN metadata_items mti2
+          ON mti1.parent_id = mti2.id
+        LEFT JOIN metadata_items mti3
+          ON mti2.parent_id = mti3.id
+        WHERE mti1.title IS NOT NULL
+          AND mti1.title != ''
+          AND media_type IN ('film', 'episode')
     """
     for row in fetch_data_from_db(source_db, query):
         Media(**row)

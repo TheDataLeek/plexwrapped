@@ -23,10 +23,44 @@ class Media(db.Entity):
     title = orm.Required(str)
     parent_title = orm.Optional(str)
     media_type = orm.Optional(str)
+    studio = orm.Optional(str)
+    rating = orm.Optional(float)
+    audience_rating = orm.Optional(float)
+    content_rating = orm.Optional(str)
+    duration_minutes = orm.Optional(int)
+    summary = orm.Optional(str)
+    year = orm.Optional(int)
+    release_date = orm.Optional(dt.date)
+    added_date = orm.Optional(dt.date)
+    tags_genre = orm.Optional(str)
+    tags_director = orm.Optional(str)
+    tags_writer = orm.Optional(str)
+    tags_star = orm.Optional(str)
+    tags_country = orm.Optional(str)
 
     streams = orm.Set("Stream")
 
     orm.composite_index(sourcedb, originalid)
+
+    @property
+    def genre(self) -> list:
+        return self.tags_genre.split("|")
+
+    @property
+    def director(self) -> list:
+        return self.tags_director.split("|")
+
+    @property
+    def writer(self) -> list:
+        return self.tags_writer.split("|")
+
+    @property
+    def star(self) -> list:
+        return self.tags_star.split("|")
+
+    @property
+    def country(self) -> list:
+        return self.tags_country.split("|")
 
 
 class Stream(db.Entity):
