@@ -44,6 +44,7 @@ class Media(db.Entity):
 
     @property
     def genre(self) -> list:
+        print(self.tags_genre)
         return self.tags_genre.split("|")
 
     @property
