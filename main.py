@@ -33,6 +33,25 @@ from plexlib.schema import Account, Media, Stream
 def main(rebuild):
     build_database(rebuild)
 
+    pl.Config.set_tbl_rows(100)
+
+    # owner_stats()
+    # individual_stats()
+
+
+@orm.db_session
+def individual_stats():
+    for user in Account.select():
+        if "zo" in user.name.lower():
+            query = f"""
+                SELECT
+                FROM stream
+            """
+            df = load_dataset(query)
+            print(user)
+
+
+def owner_stats():
     # load all media added from last year
     last_year_media_query = "SELECT * FROM media WHERE strftime('%Y', added_date) = '2023'"
     df = load_dataset(last_year_media_query)
@@ -57,7 +76,7 @@ def main(rebuild):
             pl.col("audience_rating").drop_nans().drop_nulls().mean(),
         )
         .with_columns((pl.col("duration_minutes") / 60).alias("hours"))
-        .sort(["sourcedb", "media_type"])
+        .sort("sourcedb", "media_type")
     )
     print(X)
 
@@ -83,7 +102,7 @@ def main(rebuild):
             pl.col("audience_rating").drop_nans().drop_nulls().mean(),
         )
         .with_columns((pl.col("duration_minutes") / 60).alias("hours"))
-        .sort(["sourcedb", "media_type"])
+        .sort("sourcedb", "media_type", "audience_rating")
     )
     print(X)
     X.write_csv(OUTPUT / "added_by_genre.csv")
