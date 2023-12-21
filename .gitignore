@@ -1,3 +1,5 @@
+*.feather
+.envrc
 *.csv
 output/*
 *.db
