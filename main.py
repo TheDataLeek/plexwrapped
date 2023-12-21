@@ -42,6 +42,8 @@ def main():
     ingestion, caching, and then answering all the questions!
     """
     # build_database(rebuild)
+    pl.Config.set_tbl_rows(500)
+    pl.Config.set_tbl_cols(50)
 
     df = load_dataset(
         """
@@ -56,8 +58,9 @@ def main():
     # print(df.filter((pl.col("user") == "zo347") & (pl.col("media_type") != "TV Series")))
     # return
     # owner_stats()
-    individual_stats(df)
+    # individual_stats(df, user="zo347")
     group_stats(df)
+    individual_stats(df)
 
 
 def group_stats(df: pl.DataFrame):
@@ -76,6 +79,7 @@ def group_stats(df: pl.DataFrame):
         .group_by("grandparent_title")
         .agg((pl.col("duration_minutes").sum() / 60).alias("duration_hours"))
         .sort("duration_hours")
+        .filter((pl.col("duration_hours").rank(descending=True)) <= 5)
     )
     print(X)
 
@@ -85,23 +89,24 @@ def group_stats(df: pl.DataFrame):
         .group_by("title")
         .agg((pl.col("duration_minutes").sum() / 60).alias("duration_hours"))
         .sort("duration_hours")
+        .filter((pl.col("duration_hours").rank(descending=True)) <= 5)
     )
     print(X)
 
     print("Top genre")
-    X = stats_by_tag(df, "tags_genre")
+    X = stats_by_tag(df, "tags_genre").filter((pl.col("duration_hours").rank(descending=True)) <= 5)
     print(X)
 
     print("Top star")
-    X = stats_by_tag(df, "tags_star")
+    X = stats_by_tag(df, "tags_star").filter((pl.col("duration_hours").rank(descending=True)) <= 5)
     print(X)
 
     print("Top director")
-    X = stats_by_tag(df, "tags_director")
+    X = stats_by_tag(df, "tags_director").filter((pl.col("duration_hours").rank(descending=True)) <= 5)
     print(X)
 
     print("Top country")
-    X = stats_by_tag(df, "tags_country")
+    X = stats_by_tag(df, "tags_country").filter((pl.col("duration_hours").rank(descending=True)) <= 5)
     print(X)
 
     print("Watched most past 1am MST")
@@ -112,6 +117,7 @@ def group_stats(df: pl.DataFrame):
         .group_by("user")
         .agg((pl.col("duration_minutes").sum() / 60).alias("duration_hours"))
         .sort("duration_hours")
+        .filter((pl.col("duration_hours").rank(descending=True)) <= 5)
     )
     print(X)
 
@@ -128,6 +134,8 @@ def group_stats(df: pl.DataFrame):
         .group_by("user")
         .agg((pl.col("duration_minutes").sum() / 60).alias("duration_hours"))
         .sort("duration_hours")
+        .filter((pl.col("duration_hours").rank(descending=True)) <= 5)
+        .with_columns(workdays_wasted=pl.col("duration_hours") / 8)
     )
     print(X)
 
@@ -135,6 +143,8 @@ def group_stats(df: pl.DataFrame):
 def individual_stats(df: pl.DataFrame, user=None):
     if user is not None:
         df = df.filter(pl.col("user") == user)
+
+    top_n = 3
 
     print("Total watch time")
     X = (
@@ -152,6 +162,7 @@ def individual_stats(df: pl.DataFrame, user=None):
         .group_by("user", "grandparent_title")
         .agg((pl.col("duration_minutes").sum() / 60).alias("duration_hours"))
         .sort("user", "duration_hours")
+        .filter((pl.col("duration_hours").rank(descending=True).over("user")) <= top_n)
     )
     print(X)
 
@@ -161,23 +172,53 @@ def individual_stats(df: pl.DataFrame, user=None):
         .group_by("user", "title")
         .agg((pl.col("duration_minutes").sum() / 60).alias("duration_hours"))
         .sort("user", "duration_hours")
+        .filter((pl.col("duration_hours").rank(descending=True).over("user")) <= top_n)
     )
     print(X)
 
     print("Top genre by user")
-    X = stats_by_tag(df, "tags_genre", by=["user"])
+    X = stats_by_tag(df, "tags_genre", by=["user"]).filter(
+        (pl.col("duration_hours").rank(descending=True).over("user")) <= top_n
+    )
     print(X)
 
     print("Top star by user")
-    X = stats_by_tag(df, "tags_star", by=["user"])
+    X = stats_by_tag(df, "tags_star", by=["user"]).filter(
+        (pl.col("duration_hours").rank(descending=True).over("user")) <= top_n
+    )
     print(X)
 
     print("Top director by user")
-    X = stats_by_tag(df, "tags_director", by=["user"])
+    X = stats_by_tag(df, "tags_director", by=["user"]).filter(
+        (pl.col("duration_hours").rank(descending=True).over("user")) <= top_n
+    )
     print(X)
 
     print("Top country by user")
-    X = stats_by_tag(df, "tags_country", by=["user"])
+    X = stats_by_tag(df, "tags_country", by=["user"]).filter(
+        (pl.col("duration_hours").rank(descending=True).over("user")) <= top_n
+    )
+    print(X)
+
+    print("Garbagemeter")
+    X = (
+        df.filter((pl.col("viewed_at") >= dt.date(2023, 1, 1)))
+        .filter(pl.col("media_type") != "TV Series")
+        .with_columns(
+            (
+                pl.when(pl.col("grandparent_title").is_null() | (pl.col("grandparent_title") == ""))
+                .then(pl.col("title"))
+                .otherwise(pl.concat_str(["title", "grandparent_title"], separator=" - "))
+                .alias("name")
+            ),
+        )
+        .group_by("user")
+        .agg(
+            pl.col("rating").quantile(i / 10, interpolation="nearest").alias(f"Rating Quantile @ {i/10:0.0%}")
+            for i in range(0, 11, 1)
+        )
+        .sort("Rating Quantile @ 0%")
+    )
     print(X)
 
 
