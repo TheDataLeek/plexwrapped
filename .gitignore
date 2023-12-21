@@ -1,3 +1,5 @@
+*.csv
+output/*
 *.db
 *.sql
 .idea
